@@ -12,11 +12,13 @@ import (
 func main() {
 	f, err := os.OpenFile("logs/info.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
-		panic("⚠️  Error opening file: " + err.Error())
+		panic("⚠️ Error opening file: " + err.Error())
 	}
 	defer f.Close()
 
 	infoLog := log.New(f, "INFO: ", log.Ldate|log.Ltime)
+
+	GetTokens()
 
 	go serve(infoLog)
 

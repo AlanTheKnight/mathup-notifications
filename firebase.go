@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"time"
 
 	firebase "firebase.google.com/go"
 	"firebase.google.com/go/db"
@@ -32,6 +32,7 @@ func InitClient(ctx context.Context) *db.Client {
 	return client
 }
 
+// Data stored in Firebase RTDB
 type ExpoPushToken struct {
 	// Shows if the notification subscription is active
 	Active bool
@@ -41,16 +42,40 @@ type ExpoPushToken struct {
 	Platform string
 	// Expo Push Notifications Token
 	Token string
+	// The last time when push notification was sent
+	Time int
 }
 
-func GetTokens() {
-	client := InitClient(context.Background())
+func RetrieveTokens() {
+	ctx := context.Background()
+	client := InitClient(ctx)
 	ref := client.NewRef("subscriptions/")
-	var data map[string]ExpoPushToken
-	err := ref.Get(context.Background(), &data)
+
+	localDB, read, err := LoadLocalDB("data/data.json")
 	if err != nil {
-		fmt.Println("Error")
+		errorLog.Println("⚠️ Couldn't load local data: " + err.Error())
+	} else if read {
+		infoLog.Println("✅ Local data was read from file")
 	} else {
-		fmt.Println(data)
+		errorLog.Println("⚠️ Local data was not read from file")
+	}
+
+	old := time.Unix(localDB.TimeStamp, 0)
+	new := time.Now()
+	needToRefresh := new.Sub(old).Hours() > 3 || !read
+
+	if needToRefresh {
+		err = ref.Get(ctx, &localDB.Data)
+		if err != nil {
+			errorLog.Println("⚠️ Failed to retrieve data from Firebase: " + err.Error())
+		}
+		infoLog.Printf("✅ Retrieved %d token(s) from Firebase RTDB", localDB.Size())
+		localDB.TimeStamp = time.Now().Unix()
+		err = SaveLocalDB(localDB)
+		if err != nil {
+			errorLog.Println("⚠️ Failed to save local data: " + err.Error())
+		} else {
+			infoLog.Println("✅ Saved local data")
+		}
 	}
 }
